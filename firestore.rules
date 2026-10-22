@@ -1,0 +1,167 @@
+rules_version = '2';
+
+// قواعد حماية قاعدة بيانات نظام جامعة المعقل الأهلية (تسلسل هرمي للصلاحيات RBAC)
+// انسخ هذا الملف إلى: Firebase Console > Firestore Database > Rules ثم اضغط Publish
+//
+// طرق الدخول:
+//  - Google بالبريد الجامعي @almaaqal.edu.iq
+//  - كلمة المرور: الكادر بحساب داخلي <اسم المستخدم>@pw.almaaqal.app
+//                 الطالب بحساب داخلي <الرقم المعرفي>@st.almaaqal.app
+// الكادر: staff/<البريد الجامعي>  •  الطلاب: students/<الرقم المعرفي>
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null && request.auth.token.email != null; }
+    function authEmail() { return request.auth.token.email.lower(); }
+    function localPart() { return authEmail().split('@')[0]; }
+    function isStaffPw() { return authEmail().matches('.*@pw[.]almaqal[.]app'); }
+    function isStudentPw() { return authEmail().matches('.*@st[.]almaqal[.]app'); }
+
+    // بريد الكادر لحساب كلمة مرور داخلي: من فهرس usernames (مثل doc01) أو بريد الجامعة
+    function staffEmailFor(name) {
+      return exists(/databases/$(database)/documents/usernames/$(name))
+        ? get(/databases/$(database)/documents/usernames/$(name)).data.email
+        : name + '@almaaqal.edu.iq';
+    }
+    // البريد المكافئ لهوية المستخدم
+    function email() { return isStaffPw() ? staffEmailFor(localPart()) : authEmail(); }
+
+    // المدير العام (عدّل القائمة لتطابق superAdminEmails في config.dart)
+    function isSuperAdmin() {
+      return signedIn() && authEmail() in ['drdsh.sw2022@gmail.com'];
+    }
+
+    function isMember() {
+      return signedIn() && (
+        (request.auth.token.email_verified == true &&
+          (authEmail().matches('.*@almaaqal[.]edu[.]iq') || isSuperAdmin())) ||
+        (isStaffPw() && exists(/databases/$(database)/documents/staff/$(email()))) ||
+        (isStudentPw() && exists(/databases/$(database)/documents/students/$(localPart()))));
+    }
+
+    function isStaff() {
+      return isMember() && exists(/databases/$(database)/documents/staff/$(email()));
+    }
+    function me() { return get(/databases/$(database)/documents/staff/$(email())).data; }
+    function myRole() { return isStaff() ? me().role : ''; }
+
+    // الإدارة العليا ومدير النظام: كل الجامعة
+    function isTop() { return isSuperAdmin() || myRole() in ['admin', 'president']; }
+
+    function deptCollege(deptId) {
+      return get(/databases/$(database)/documents/departments/$(deptId)).data.collegeId;
+    }
+
+    // هل يدير المستخدم هذا القسم؟ (رئيس القسم لقسمه، العميد لأقسام كليته)
+    function managesDept(deptId) {
+      return isTop() || (deptId is string && (
+        (myRole() == 'head' && me().deptId == deptId) ||
+        (myRole() == 'dean' &&
+          exists(/databases/$(database)/documents/departments/$(deptId)) &&
+          deptCollege(deptId) == me().collegeId)));
+    }
+
+    function onlyChanges(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    // الهيكل والإعدادات
+    match /colleges/{id}    { allow read: if isMember(); allow write: if isTop(); }
+    match /departments/{id} { allow read: if isMember(); allow write: if isTop(); }
+    match /settings/{id}    { allow read: if isMember(); allow write: if isTop(); }
+    match /meta/{id}        { allow read: if isMember(); allow write: if isTop(); }
+
+    match /courses/{id} {
+      allow read: if isMember();
+      allow create, update: if managesDept(request.resource.data.deptId);
+      allow delete: if managesDept(resource.data.deptId);
+    }
+
+    match /students/{id} {
+      allow read: if isMember() || (isStudentPw() && id == localPart());
+      allow create: if managesDept(request.resource.data.deptId);
+      allow update: if managesDept(request.resource.data.deptId) ||
+        (isStaff() && onlyChanges(['nfcUid'])) ||
+        // الطالب يثبّت تفعيل حسابه بعد تغيير كلمة المرور الأولية
+        (isStudentPw() && id == localPart() && onlyChanges(['activated']));
+      allow delete: if managesDept(resource.data.deptId);
+    }
+
+    function canAssign(data) {
+      return isSuperAdmin() || myRole() == 'admin' ||
+        (myRole() == 'president' && data.role != 'admin') ||
+        (myRole() == 'dean' && data.role in ['head', 'doctor'] && managesDept(data.deptId)) ||
+        (myRole() == 'head' && data.role == 'doctor' && managesDept(data.deptId));
+    }
+
+    match /staff/{staffEmail} {
+      allow read: if isMember() || (signedIn() && staffEmail == email());
+      allow create: if canAssign(request.resource.data) ||
+        (staffEmail == email() && isSuperAdmin()) ||
+        // أول دخول لمدير النظام admin بكلمة المرور
+        (isStaffPw() && staffEmail == 'admin@almaaqal.edu.iq' &&
+          staffEmail == email() && request.resource.data.role == 'admin');
+      allow update: if (canAssign(resource.data) && canAssign(request.resource.data)) ||
+        (staffEmail == email() && onlyChanges(['courseIds', 'activated']));
+      allow delete: if canAssign(resource.data);
+    }
+
+    // فهرس أسماء المستخدمين المختارة (doc01 ← البريد) يُقرأ قبل تسجيل الدخول
+    match /usernames/{name} {
+      allow read: if true;
+      allow write: if isTop() && name != 'admin';
+    }
+
+    match /sessions/{id} {
+      allow read: if isMember();
+      allow create: if isStaff() && request.resource.data.doctorId == email();
+      allow update, delete: if resource.data.doctorId == email() ||
+        managesDept(resource.data.deptId);
+    }
+
+    function sessionData(sessionId) {
+      return get(/databases/$(database)/documents/sessions/$(sessionId)).data;
+    }
+    function canTakeAttendance(sessionId) {
+      return isStaff() && (sessionData(sessionId).doctorId == email() ||
+        managesDept(sessionData(sessionId).deptId));
+    }
+
+    match /attendance/{id} {
+      allow read: if isMember();
+      allow create: if canTakeAttendance(request.resource.data.sessionId) &&
+        id == request.resource.data.sessionId + '_' + request.resource.data.studentId;
+      allow update: if false;
+      allow delete: if canTakeAttendance(resource.data.sessionId);
+    }
+
+    // ---------------- الدرجات والدروس ----------------
+    function courseDept(courseId) {
+      return get(/databases/$(database)/documents/courses/$(courseId)).data.deptId;
+    }
+    // مدرّس المادة أو من يدير قسمها
+    function canGrade(courseId) {
+      return isStaff() && (courseId in me().courseIds || managesDept(courseDept(courseId)));
+    }
+
+    match /schemes/{id} {
+      allow read: if isMember();
+      allow write: if canGrade(request.resource.data.courseId);
+    }
+
+    match /grades/{id} {
+      // الكادر يرى الدرجات؛ الطالب يرى درجاته فقط
+      allow read: if isStaff() ||
+        (isMember() && (resource.data.studentId == localPart() ||
+                        resource.data.studentEmail == authEmail()));
+      allow create, update: if canGrade(request.resource.data.courseId);
+      allow delete: if canGrade(resource.data.courseId);
+    }
+
+    match /lessons/{id} {
+      allow read: if isMember();
+      allow create, update: if canGrade(request.resource.data.courseId);
+      allow delete: if canGrade(resource.data.courseId);
+    }
+  }
+}

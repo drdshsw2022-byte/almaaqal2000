@@ -1,0 +1,72 @@
+[
+ {
+  "id": "ahalna.net@gmail.com",
+  "email": "ahalna.net@gmail.com",
+  "name": "د. احمد خطيب",
+  "role": "doctor",
+  "alias": "doc01",
+  "initPw": "4bc42f96b8617819020b0e763d9f0ada87a0f968e904b82632e35180dc76d4f8",
+  "courseIds": [],
+  "activated": false
+ },
+ {
+  "id": "haider.1971@gmail.com",
+  "email": "haider.1971@gmail.com",
+  "name": "د. احمد الشافعي",
+  "role": "doctor",
+  "alias": "doc02",
+  "initPw": "06ae273aedd86a87099161095c3d1e5e6eae35b95e55b542cb027fbeb574f69a",
+  "courseIds": [],
+  "activated": false
+ },
+ {
+  "id": "shatt.alarb@gmail.com",
+  "email": "shatt.alarb@gmail.com",
+  "name": "د. نبيل شواي",
+  "role": "doctor",
+  "alias": "doc03",
+  "initPw": "ce91394850c29fe75c859e6c39cf0a80e87d7f86022c820fdc06289729bf66bd",
+  "courseIds": [],
+  "activated": false
+ },
+ {
+  "id": "fifo65556@gmail.com",
+  "email": "fifo65556@gmail.com",
+  "name": "د. احمد دنقل",
+  "role": "doctor",
+  "alias": "doc04",
+  "initPw": "d89da6bef9aa85809e53301ccb9e0c56b452e95a9a285bb1dfa2f6e1bd783c58",
+  "courseIds": [],
+  "activated": false
+ },
+ {
+  "id": "gitcs.21@gmail.com",
+  "email": "gitcs.21@gmail.com",
+  "name": "د. عماد بدر الدين",
+  "role": "doctor",
+  "alias": "doc05",
+  "initPw": "7e0489033ebe8c1c3c91aa9887aa80d7236fbcf1337f71ef23e615b6fb920349",
+  "courseIds": [],
+  "activated": false
+ },
+ {
+  "id": "t.c.basra.iq@gmail.com",
+  "email": "t.c.basra.iq@gmail.com",
+  "name": "د. علاء ربيع",
+  "role": "doctor",
+  "alias": "doc06",
+  "initPw": "5ac91cf124d68f47152a261db7dfadb0fcbc0ccbbd204a7747dd71f467fb8245",
+  "courseIds": [],
+  "activated": false
+ },
+ {
+  "id": "hid.you82@gmail.com",
+  "email": "hid.you82@gmail.com",
+  "name": "د. ايمن محمود",
+  "role": "doctor",
+  "alias": "doc07",
+  "initPw": "763a9bf47fffcfa891e2d0f9c10e3f369e44093486493651fe31d229556e522a",
+  "courseIds": [],
+  "activated": false
+ }
+]

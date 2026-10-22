@@ -1,0 +1,1 @@
+{"colleges": [{"id": "eng", "name": "كلية الهندسة"}], "departments": [{"id": "ai", "name": "هندسة الذكاء الاصطناعي", "collegeId": "eng"}, {"id": "control", "name": "هندسة السيطرة والحاسبات", "collegeId": "eng"}, {"id": "cyber", "name": "هندسة الأمن السيبراني", "collegeId": "eng"}]}

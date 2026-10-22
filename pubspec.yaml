@@ -1,0 +1,51 @@
+name: almaqal_attendance
+description: "نظام الحضور والغياب بتقنية QR - جامعة المعقل الأهلية في البصرة"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+# الإصدارات مثبّتة عمداً لتتوافق مع Flutter 3.24.5 (المستخدم في البناء التلقائي)
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  firebase_core: 3.6.0
+  firebase_auth: 5.3.1
+  cloud_firestore: 5.4.4
+  google_sign_in: 6.2.1
+  mobile_scanner: 5.2.3
+  qr_flutter: 4.1.0
+  shared_preferences: 2.3.2
+  google_fonts: 6.2.1
+  share_plus: 10.1.0
+  nfc_manager: 3.5.0
+  excel: 4.0.6
+  archive: ^3.6.1
+  xml: ^6.5.0
+  file_picker: 8.1.2
+  crypto: 3.0.5
+  url_launcher: 6.3.1
+  intl: 0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: 4.0.0
+  flutter_launcher_icons: 0.14.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/data/
+    - assets/images/
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/icon.png"
+  min_sdk_android: 23
+  adaptive_icon_background: "#16183A"
+  adaptive_icon_foreground: "assets/images/icon_fg.png"
