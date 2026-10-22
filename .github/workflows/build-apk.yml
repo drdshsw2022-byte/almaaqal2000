@@ -1,0 +1,105 @@
+name: بناء ملف APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: stable
+          cache: true
+
+      - name: تجهيز ملفات Android
+        run: bash ci/prepare_android.sh
+
+      - name: مفتاح توقيع ثابت (لازم لتسجيل الدخول بـ Google)
+        run: |
+          mkdir -p ~/.android
+          cp ci/debug.keystore ~/.android/debug.keystore
+
+      - name: إعدادات Gradle لتحمّل ازدحام الشبكة (خطأ 429)
+        run: |
+          mkdir -p ~/.gradle
+          rm -f ~/.gradle/init.d/mirror.gradle
+          cat >> ~/.gradle/gradle.properties <<'EOF'
+          org.gradle.internal.repository.max.retries=10
+          org.gradle.internal.repository.initial.backoff=3000
+          org.gradle.internal.http.connectionTimeout=120000
+          org.gradle.internal.http.socketTimeout=120000
+          EOF
+          cat ~/.gradle/gradle.properties
+
+      - name: ذاكرة Gradle المؤقتة
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('pubspec.yaml') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: تنزيل الحزم
+        run: flutter pub get
+
+      - name: أيقونة التطبيق
+        run: dart run flutter_launcher_icons
+
+      - name: بناء APK
+        env:
+          FB_API_KEY: ${{ secrets.FB_API_KEY }}
+          FB_APP_ID: ${{ secrets.FB_APP_ID }}
+          FB_SENDER_ID: ${{ secrets.FB_SENDER_ID }}
+          FB_PROJECT_ID: ${{ secrets.FB_PROJECT_ID }}
+          FB_STORAGE_BUCKET: ${{ secrets.FB_STORAGE_BUCKET }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+        run: |
+          # إعادة المحاولة حتى 3 مرات في حال تعثّر التنزيل من الشبكة
+          for i in 1 2 3; do
+            if flutter build apk --release \
+              --dart-define=FB_API_KEY="$FB_API_KEY" \
+              --dart-define=FB_APP_ID="$FB_APP_ID" \
+              --dart-define=FB_SENDER_ID="$FB_SENDER_ID" \
+              --dart-define=FB_PROJECT_ID="$FB_PROJECT_ID" \
+              --dart-define=FB_STORAGE_BUCKET="$FB_STORAGE_BUCKET" \
+              --dart-define=GOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID"; then
+              break
+            fi
+            if [ "$i" = 3 ]; then exit 1; fi
+            echo "فشلت المحاولة $i، إعادة بعد دقيقتين..."
+            sleep 120
+          done
+          mkdir -p dist
+          if [ -n "$FB_API_KEY" ]; then MODE=firebase; else MODE=demo; fi
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/almaqal-attendance-${MODE}.apk"
+          ls -la dist
+
+      - name: رفع الملف كـ Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: almaqal-attendance-apk
+          path: dist/*.apk
+
+      - name: نشر الإصدار للتنزيل المباشر من الهاتف
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: نسخة رقم ${{ github.run_number }}
+          body: ملف APK لتطبيق الحضور والغياب - جامعة المعقل الأهلية.
+          files: dist/*.apk
